@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 use std::io::Read;
 use std::net::TcpListener;
+use std::str::FromStr;
 
 fn main() {
     let server = Server::new("0.0.0.0", "3000");
@@ -29,7 +30,9 @@ impl Server {
                             let request = String::from_utf8_lossy(&buf).to_string();
                             println!("Request Data: {}", request);
                             match Request::try_from(request) {
-                                Ok(r) => print!("method: {}, path: {}, protocol: {}", r.method, r.path, r.protocol),
+                                Ok(r) => print!(
+                                    "path: {}, protocol: {}", r.path, r.protocol
+                                ),
                                 Err(e) => println!("Invalid request {}", e),
                             };
                         }
@@ -44,7 +47,7 @@ impl Server {
 
 // POST /health?pickaboo=bamm HTTP/1.1
 struct Request {
-    method: String,
+    method: Method,
     path: String,
     protocol: String,
 }
@@ -54,14 +57,44 @@ impl TryFrom<String> for Request {
 
     fn try_from(request: String) -> Result<Self, Self::Error> {
         let (method, request) = get_request_segment(&request).ok_or("Invalid Request")?;
+        let method = Method::from_str(method).or(Err("Invalid Method"))?;
+
         let (path, request) = get_request_segment(&request).ok_or("Invalid Request")?;
         let (protocol, _request) = get_request_segment(&request).ok_or("Invalid Request")?;
 
         Ok(Request {
-            method: method.to_string(),
+            method: method,
             path: path.to_string(),
             protocol: protocol.to_string(),
         })
+    }
+}
+
+enum Method {
+    GET,
+    HEAD,
+    POST,
+    PATCH,
+    PUT,
+    DELETE,
+    CONNECT,
+}
+
+impl FromStr for Method {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "GET" => Ok(Method::GET),
+            "HEAD" => Ok(Method::HEAD),
+            "POST" => Ok(Method::POST),
+            "PATCH" => Ok(Method::PATCH),
+            "PUT" => Ok(Method::PUT),
+            "DELETE" => Ok(Method::DELETE),
+            "CONNECT" => Ok(Method::CONNECT),
+
+            _ => Err("Invalid method".to_string()),
+        }
     }
 }
 
