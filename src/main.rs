@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::io::Read;
 use std::net::TcpListener;
 use std::str::FromStr;
@@ -30,10 +31,8 @@ impl Server {
                             let request = String::from_utf8_lossy(&buf).to_string();
                             println!("Request Data: {}", request);
                             match Request::try_from(request) {
-                                Ok(r) => print!(
-                                    "path: {}, protocol: {}", r.path, r.protocol
-                                ),
-                                Err(e) => println!("Invalid request {}", e),
+                                Ok(r) => print!("path: {}, protocol: {}", r.path, r.protocol),
+                                Err(e) => println!("Error {:?}", e),
                             };
                         }
                         Err(e) => println!("Error reading from stream: {}", e),
@@ -52,18 +51,40 @@ struct Request {
     protocol: String,
 }
 
+enum ParseError {
+    InvalidProtocol,
+    InvalidMethod,
+    InvalidRequest,
+}
+
+impl Debug for ParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            Self::InvalidMethod => write!(f, "{}", "Invalid Method"),
+            Self::InvalidProtocol => return write!(f, "{}", "Invalid Protocol"),
+            Self::InvalidRequest => return write!(f, "{}", "Invalid Request"),
+        }
+    }
+}
+
 impl TryFrom<String> for Request {
-    type Error = String;
+    type Error = ParseError;
 
     fn try_from(request: String) -> Result<Self, Self::Error> {
-        let (method, request) = get_request_segment(&request).ok_or("Invalid Request")?;
-        let method = Method::from_str(method).or(Err("Invalid Method"))?;
+        let (method, request) = get_request_segment(&request).ok_or(ParseError::InvalidRequest)?;
+        let method: Method = method.parse().or(Err(ParseError::InvalidMethod))?;
 
-        let (path, request) = get_request_segment(&request).ok_or("Invalid Request")?;
-        let (protocol, _request) = get_request_segment(&request).ok_or("Invalid Request")?;
+        let (path, request) = get_request_segment(&request).ok_or(ParseError::InvalidRequest)?;
+        let (protocol, _request) =
+            get_request_segment(&request).ok_or(ParseError::InvalidRequest)?;
+
+        // fix new line delimiter error on this
+        if protocol != "HTTP/1.1" {
+            return Err(ParseError::InvalidProtocol);
+        }
 
         Ok(Request {
-            method: method,
+            method,
             path: path.to_string(),
             protocol: protocol.to_string(),
         })
@@ -80,8 +101,10 @@ enum Method {
     CONNECT,
 }
 
+struct MethodError;
+
 impl FromStr for Method {
-    type Err = String;
+    type Err = MethodError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -93,7 +116,7 @@ impl FromStr for Method {
             "DELETE" => Ok(Method::DELETE),
             "CONNECT" => Ok(Method::CONNECT),
 
-            _ => Err("Invalid method".to_string()),
+            _ => Err(MethodError),
         }
     }
 }
