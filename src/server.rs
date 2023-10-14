@@ -1,8 +1,9 @@
+use super::method::Method;
+use super::query::Query;
 use std::convert::TryFrom;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::io::Read;
 use std::net::TcpListener;
-use super::method::Method;
 
 pub struct Server {
     addr: String,
@@ -27,7 +28,10 @@ impl Server {
                             let request = String::from_utf8_lossy(&buf).to_string();
                             println!("Request Data: {}", request);
                             match Request::try_from(request) {
-                                Ok(r) => print!("path: {}, protocol: {}", r.path, r.protocol),
+                                Ok(r) => print!(
+                                    "path: {}, method: {:?}, protocol: {}",
+                                    r.path, r.method, r.protocol
+                                ),
                                 Err(e) => println!("Error {:?}", e),
                             };
                         }
@@ -74,10 +78,26 @@ impl TryFrom<String> for Request {
         let (protocol, _request) =
             get_request_segment(&request).ok_or(ParseError::InvalidRequest)?;
 
-        // fix new line delimiter error on this
-        if protocol != "HTTP/1.1" {
-            return Err(ParseError::InvalidProtocol);
+        let route: &str;
+        let query_string: Option<&str>;
+
+        if let Some(i) = path.find("?") {
+            route = &path[..i];
+            query_string = Some(&path[(i + 1)..]);
+        } else {
+            route = path;
+            query_string = None;
         }
+        println!("route: {}, query string {:?}", route, query_string);
+
+        let query_map = Query::from(query_string);
+
+        println!("{:?}", query_map.query);
+
+        // fix new line delimiter error on this
+        // if protocol != "HTTP/1.1" {
+        //     return Err(ParseError::InvalidProtocol);
+        // }
 
         Ok(Request {
             method,
