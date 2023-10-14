@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "server-study"
+name = "serverstudy"
 version = "0.1.0"
