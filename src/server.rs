@@ -19,14 +19,15 @@ impl Server {
     pub fn listen(self) {
         loop {
             let listener = TcpListener::bind(&self.addr).unwrap();
+
             match listener.accept() {
                 Ok((mut stream, _)) => {
-                    let mut buf: [u8; 246] = [0; 246];
+                    let mut buf: [u8; 1024] = [0; 1024];
+
                     match stream.read(&mut buf) {
                         Ok(_) => {
-                            println!("buffer: {:?}", buf);
                             let request = String::from_utf8_lossy(&buf).to_string();
-                            println!("Request Data: {}", request);
+
                             match Request::try_from(request) {
                                 Ok(r) => print!(
                                     "path: {}, method: {:?}, protocol: {}",
@@ -94,7 +95,7 @@ impl TryFrom<String> for Request {
 
         println!("{:?}", query_map.query);
 
-        // fix new line delimiter error on this
+        // TODO: fix new line delimiter error on this
         // if protocol != "HTTP/1.1" {
         //     return Err(ParseError::InvalidProtocol);
         // }
